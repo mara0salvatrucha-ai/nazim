@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Мой друг — интерактив</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --accent:#39d0ff; --accent2:#a96bff;
+    --text:#eaf2ff; --muted:#90a0c0; --card:#0f1730cc;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 70% -10%, #1b2752 0%, var(--bg) 60%);
+    color:var(--text); overflow:hidden; touch-action:manipulation;
+  }
+  #app{position:fixed; inset:0; display:flex; flex-direction:column;}
+  header{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; gap:10px; z-index:30;}
+  .title{font-weight:700; font-size:18px;}
+  .title span{color:var(--accent);}
+  .top-btns{display:flex; gap:8px; align-items:center;}
+  button.icon{
+    background:#ffffff14; border:1px solid #ffffff22; color:var(--text);
+    width:42px; height:42px; border-radius:12px; font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:.2s;
+  }
+  button.icon:hover{background:#ffffff26; transform:translateY(-1px);}
+  .switch{display:flex; background:#ffffff14; border:1px solid #ffffff22; border-radius:12px; overflow:hidden;}
+  .switch button{background:transparent; border:0; color:var(--muted); padding:10px 16px; cursor:pointer; font-weight:600; font-size:14px; transition:.2s;}
+  .switch button.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#06101f;}
+
+  .stage{position:relative; flex:1; min-height:0;}
+  .view{position:absolute; inset:0; display:none; align-items:center; justify-content:center;}
+  .view.active{display:flex;}
+
+  .photo-wrap{
+    position:relative; height:86%; max-height:86%;
+    transition:transform .6s cubic-bezier(.22,1,.36,1); will-change:transform;
+  }
+  .photo-wrap img{height:100%; display:block; border-radius:14px; filter:drop-shadow(0 20px 40px #000a); user-select:none; -webkit-user-drag:none;}
+  .hotspot{
+    position:absolute; width:26px; height:26px; transform:translate(-50%,-50%);
+    border-radius:50%; cursor:pointer; border:2px solid #fff; background:var(--accent);
+    box-shadow:0 0 0 0 #39d0ff88; animation:pulse 2s infinite; z-index:5;
+  }
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #39d0ffaa;}70%{box-shadow:0 0 0 16px #39d0ff00;}100%{box-shadow:0 0 0 0 #39d0ff00;}}
+  .hotspot:hover{transform:translate(-50%,-50%) scale(1.25);}
+
+  /* Стрелки поворота */
+  .rot-btn{position:absolute; top:50%; transform:translateY(-50%); z-index:10; width:48px; height:48px; font-size:22px;}
+  #rotPrev{left:14px;} #rotNext{right:14px;}
+  .rot-label{position:absolute; bottom:14px; left:50%; transform:translateX(-50%); color:var(--muted); font-size:13px; background:#0008; padding:6px 14px; border-radius:20px; z-index:10;}
+
+  .panel{
+    position:absolute; top:0; right:0; height:100%; width:380px; max-width:90vw;
+    background:var(--card); backdrop-filter:blur(14px); border-left:1px solid #ffffff1a;
+    padding:24px; z-index:40; transform:translateX(105%);
+    transition:transform .45s cubic-bezier(.22,1,.36,1); overflow-y:auto;
+  }
+  .panel.open{transform:translateX(0);}
+  .panel h2{font-size:24px; margin-bottom:6px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .panel .desc{color:#d6e2ff; line-height:1.6; margin:14px 0 20px; font-size:15px;}
+  .stat{margin-bottom:12px;}
+  .stat .row{display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:4px;}
+  .bar{height:8px; background:#ffffff14; border-radius:8px; overflow:hidden;}
+  .bar i{display:block; height:100%; border-radius:8px; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .8s ease;}
+  .panel .close{position:absolute; top:14px; right:14px;}
+
+  .settings{position:absolute; top:64px; right:16px; width:260px; background:var(--card); backdrop-filter:blur(14px); border:1px solid #ffffff1a; border-radius:16px; padding:18px; z-index:50; display:none;}
+  .settings.open{display:block;}
+  .settings h3{font-size:14px; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;}
+  .lang-row{display:flex; gap:8px;}
+  .lang-row button{flex:1; padding:10px; border-radius:10px; border:1px solid #ffffff22; background:#ffffff10; color:var(--text); cursor:pointer; font-weight:600;}
+  .lang-row button.active{background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#06101f; border-color:transparent;}
+
+  .toast{position:absolute; bottom:24px; left:50%; transform:translateX(-50%) translateY(120%); background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#06101f; padding:14px 22px; border-radius:14px; font-weight:700; z-index:60; transition:transform .5s cubic-bezier(.22,1,.36,1); box-shadow:0 10px 30px #0007;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .particle{position:absolute; width:8px; height:8px; border-radius:50%; pointer-events:none; z-index:35;}
+
+  @media (max-width:640px){
+    .title{font-size:15px;} .switch button{padding:9px 12px; font-size:13px;}
+    button.icon{width:38px;height:38px;font-size:16px;} .panel{width:100%; max-width:100%;}
+    .photo-wrap{height:76%;} .rot-btn{width:42px;height:42px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title" id="siteTitle">🕺 Мой <span>друг</span></div>
+    <div class="top-btns">
+      <div class="switch">
+        <button id="btnPhoto" class="active">Фото</button>
+        <button id="btnRotate">Поворот</button>
+      </div>
+      <button class="icon" id="btnMusic" title="Музыка">🔇</button>
+      <button class="icon" id="btnShare" title="Поделиться">🔗</button>
+      <button class="icon" id="btnSettings" title="Настройки">⚙️</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <!-- Режим ФОТО (только спереди) -->
+    <div id="viewPhoto" class="view active">
+      <div class="photo-wrap" id="photoWrap">
+        <img id="photoImg" alt="front" />
+      </div>
+    </div>
+
+    <!-- Режим ПОВОРОТ (3 ракурса) -->
+    <div id="viewRotate" class="view">
+      <button class="icon rot-btn" id="rotPrev">‹</button>
+      <div class="photo-wrap" id="rotWrap">
+        <img id="rotImg" alt="angle" />
+      </div>
+      <button class="icon rot-btn" id="rotNext">›</button>
+      <div class="rot-label" id="rotLabel"></div>
+    </div>
+
+    <!-- Карточка -->
+    <div class="panel" id="panel">
+      <button class="icon close" id="panelClose">✕</button>
+      <h2 id="pTitle"></h2>
+      <div class="desc" id="pDesc"></div>
+      <div id="pStats"></div>
+    </div>
+
+    <!-- Настройки -->
+    <div class="settings" id="settingsBox">
+      <h3 id="setLangLabel">Язык</h3>
+      <div class="lang-row">
+        <button data-lang="ru" class="active">Русский</button>
+        <button data-lang="en">English</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<audio id="bgm" loop></audio>
+
+<script>
+/* =====================================================================
+   ⚙️  CONFIG — РЕДАКТИРУЙ ВСЁ ЗДЕСЬ
+   ---------------------------------------------------------------------
+   - images: имена твоих 3 файлов (положи рядом с index.html)
+   - musicUrl: файл/ссылка музыки (пусто = выкл)
+   - У каждой части тела:
+       name/desc/stats — текст (вставляй свой!)
+       pos: положение точки в % для КАЖДОГО ракурса:
+         front / side / back  ({x,y} или null — если с этого ракурса точку не показывать)
+   Подсказка по точкам: x — слева направо (0..100), y — сверху вниз (0..100).
+   Открой сайт и подкрути числа, пока точка не сядет ровно на нужное место.
+   ===================================================================== */
+const CONFIG = {
+  images: {
+    front: "friend-front.jpg",
+    side:  "friend-side.jpg",
+    back:  "friend-back.jpg",
+  },
+  musicUrl: "", // напр. "music.mp3"
+  ui: {
+    title:   { ru: "🕺 Мой <span>друг</span>", en: "🕺 My <span>friend</span>" },
+    settings:{ ru: "Язык", en: "Language" },
+    allDone: { ru: "🏆 Ты открыл все части тела!", en: "🏆 You unlocked every part!" },
+    egg:     { ru: "🥚 Секретка! Привет от твоего друга 👋", en: "🥚 Easter egg! Hi from your friend 👋" },
+    copied:  { ru: "🔗 Ссылка скопирована", en: "🔗 Link copied" },
+  },
+  // Подписи ракурсов в режиме «Поворот»
+  views: [
+    { id:"front", label:{ ru:"Спереди", en:"Front" } },
+    { id:"side",  label:{ ru:"Сбоку",   en:"Side"  } },
+    { id:"back",  label:{ ru:"Сзади",   en:"Back"  } },
+  ],
+  parts: [
+    {
+      id:"head",
+      name:{ ru:"Голова", en:"Head" },
+      desc:{ ru:"Сюда впиши описание головы.", en:"Head description here." },
+      stats:[ {label:{ru:"Ум",en:"Smarts"},value:90}, {label:{ru:"Харизма",en:"Charisma"},value:80} ],
+      pos:{ front:{x:50,y:8}, side:{x:52,y:8}, back:{x:50,y:8} }
+    },
+    {
+      id:"torso",
+      name:{ ru:"Торс", en:"Torso" },
+      desc:{ ru:"Описание торса.", en:"Torso description." },
+      stats:[ {label:{ru:"Сила",en:"Strength"},value:75}, {label:{ru:"Выносливость",en:"Stamina"},value:70} ],
+      pos:{ front:{x:50,y:33}, side:{x:50,y:33}, back:{x:50,y:33} }
+    },
+    {
+      id:"leftArm",
+      name:{ ru:"Левая рука", en:"Left arm" },
+      desc:{ ru:"Описание левой руки.", en:"Left arm description." },
+      stats:[ {label:{ru:"Хват",en:"Grip"},value:65} ],
+      pos:{ front:{x:30,y:42}, side:null, back:{x:70,y:42} }
+    },
+    {
+      id:"rightArm",
+      name:{ ru:"Правая рука", en:"Right arm" },
+      desc:{ ru:"Описание правой руки.", en:"Right arm description." },
+      stats:[ {label:{ru:"Хват",en:"Grip"},value:68} ],
+      pos:{ front:{x:70,y:42}, side:{x:48,y:42}, back:{x:30,y:42} }
+    },
+    {
+      id:"legs",
+      name:{ ru:"Ноги", en:"Legs" },
+      desc:{ ru:"Описание ног.", en:"Legs description." },
+      stats:[ {label:{ru:"Скорость",en:"Speed"},value:85} ],
+      pos:{ front:{x:50,y:72}, side:{x:50,y:72}, back:{x:50,y:72} }
+    },
+    {
+      id:"feet",
+      name:{ ru:"Стопы", en:"Feet" },
+      desc:{ ru:"Описание стоп.", en:"Feet description." },
+      stats:[ {label:{ru:"Баланс",en:"Balance"},value:78} ],
+      pos:{ front:{x:50,y:95}, side:{x:50,y:95}, back:{x:50,y:95} }
+    },
+  ],
+};
+
+/* ===================== ЛОГИКА (можно не трогать) ===================== */
+let lang = localStorage.getItem("lang") || "ru";
+let mode = "photo";        // photo | rotate
+let angleIndex = 0;        // индекс в CONFIG.views
+const visited = new Set();
+const $ = s => document.querySelector(s);
+function t(o){ return o[lang] ?? o.ru; }
+
+/* Предзагрузка изображений */
+$("#photoImg").src = CONFIG.images.front;
+
+function applyLang(){
+  document.documentElement.lang = lang;
+  $("#siteTitle").innerHTML = t(CONFIG.ui.title);
+  $("#setLangLabel").textContent = t(CONFIG.ui.settings);
+  document.querySelectorAll(".lang-row button").forEach(b=> b.classList.toggle("active", b.dataset.lang===lang));
+  renderPhotoHotspots();
+  if(mode==="rotate") renderRotate();
+  if(currentPart) openPanel(currentPart);
+}
+
+/* ---- Создание хотспотов для ракурса ---- */
+function buildHotspots(wrap, angleId){
+  wrap.querySelectorAll(".hotspot").forEach(h=>h.remove());
+  CONFIG.parts.forEach(p=>{
+    const pos = p.pos[angleId];
+    if(!pos) return; // на этом ракурсе точки нет
+    const h = document.createElement("div");
+    h.className="hotspot"; h.style.left=pos.x+"%"; h.style.top=pos.y+"%"; h.title=t(p.name);
+    h.addEventListener("click", e=>{
+      e.stopPropagation();
+      wrap.style.transformOrigin = pos.x+"% "+pos.y+"%";
+      wrap.style.transform = "scale(2.1)";
+      spawnParticles(innerWidth/2, innerHeight/2);
+      openPanel(p);
+      if(p.id==="head") headClick();
+    });
+    wrap.appendChild(h);
+  });
+}
+function renderPhotoHotspots(){ buildHotspots($("#photoWrap"), "front"); }
+function resetZoom(){ $("#photoWrap").style.transform="scale(1)"; $("#rotWrap").style.transform="scale(1)"; }
+
+/* ---- Режим поворота ---- */
+function renderRotate(){
+  const v = CONFIG.views[angleIndex];
+  $("#rotImg").src = CONFIG.images[v.id];
+  $("#rotLabel").textContent = t(v.label) + "  (" + (angleIndex+1) + "/" + CONFIG.views.length + ")";
+  buildHotspots($("#rotWrap"), v.id);
+}
+function rotate(dir){
+  angleIndex = (angleIndex + dir + CONFIG.views.length) % CONFIG.views.length;
+  resetZoom(); renderRotate();
+}
+$("#rotPrev").onclick = ()=>rotate(-1);
+$("#rotNext").onclick = ()=>rotate(1);
+// свайп пальцем/мышью
+let dragX=null;
+$("#rotWrap").addEventListener("pointerdown", e=>dragX=e.clientX);
+window.addEventListener("pointerup", e=>{
+  if(dragX===null) return; const dx=e.clientX-dragX; dragX=null;
+  if(Math.abs(dx)>60) rotate(dx<0?1:-1);
+});
+
+/* ---- Карточка ---- */
+let currentPart=null;
+function openPanel(p){
+  currentPart=p;
+  $("#pTitle").textContent=t(p.name);
+  $("#pDesc").textContent=t(p.desc);
+  const box=$("#pStats"); box.innerHTML="";
+  (p.stats||[]).forEach(s=> box.insertAdjacentHTML("beforeend",
+    `<div class="stat"><div class="row"><span>${t(s.label)}</span><span>${s.value}</span></div><div class="bar"><i></i></div></div>`));
+  $("#panel").classList.add("open");
+  requestAnimationFrame(()=> box.querySelectorAll(".bar i").forEach((el,i)=> el.style.width=p.stats[i].value+"%"));
+  visited.add(p.id);
+  if(visited.size===CONFIG.parts.length) showToast(t(CONFIG.ui.allDone));
+}
+function closePanel(){ $("#panel").classList.remove("open"); currentPart=null; resetZoom(); }
+$("#panelClose").onclick=closePanel;
+
+/* ---- Тосты / частицы ---- */
+let toastTimer;
+function showToast(m){ const el=$("#toast"); el.textContent=m; el.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),3000); }
+function spawnParticles(x,y){
+  for(let i=0;i<18;i++){
+    const d=document.createElement("div"); d.className="particle";
+    d.style.left=x+"px"; d.style.top=y+"px"; d.style.background=Math.random()>.5?"#39d0ff":"#a96bff";
+    $(".stage").appendChild(d);
+    const a=Math.random()*6.28, dist=60+Math.random()*120, dx=Math.cos(a)*dist, dy=Math.sin(a)*dist;
+    d.animate([{transform:"translate(0,0)",opacity:1},{transform:`translate(${dx}px,${dy}px)`,opacity:0}],{duration:700+Math.random()*400,easing:"cubic-bezier(.22,1,.36,1)"}).onfinish=()=>d.remove();
+  }
+}
+
+/* ---- Переключение режимов ---- */
+$("#btnPhoto").onclick=()=>setMode("photo");
+$("#btnRotate").onclick=()=>setMode("rotate");
+function setMode(m){
+  mode=m;
+  $("#btnPhoto").classList.toggle("active", m==="photo");
+  $("#btnRotate").classList.toggle("active", m==="rotate");
+  $("#viewPhoto").classList.toggle("active", m==="photo");
+  $("#viewRotate").classList.toggle("active", m==="rotate");
+  closePanel();
+  if(m==="photo") renderPhotoHotspots(); else renderRotate();
+}
+
+/* ---- Настройки / язык ---- */
+$("#btnSettings").onclick=()=> $("#settingsBox").classList.toggle("open");
+document.querySelectorAll(".lang-row button").forEach(b=> b.onclick=()=>{ lang=b.dataset.lang; localStorage.setItem("lang",lang); applyLang(); });
+
+/* ---- Музыка ---- */
+const bgm=$("#bgm"); let playing=false;
+if(CONFIG.musicUrl) bgm.src=CONFIG.musicUrl;
+$("#btnMusic").onclick=()=>{
+  if(!CONFIG.musicUrl){ showToast("🎵 Укажи musicUrl в CONFIG"); return; }
+  playing=!playing;
+  if(playing){ bgm.play(); $("#btnMusic").textContent="🔊"; } else { bgm.pause(); $("#btnMusic").textContent="🔇"; }
+};
+
+/* ---- Поделиться ---- */
+$("#btnShare").onclick=async ()=>{
+  const url=location.href;
+  if(navigator.share){ try{ await navigator.share({title:document.title,url}); }catch(e){} }
+  else { try{ await navigator.clipboard.writeText(url); showToast(t(CONFIG.ui.copied)); }catch(e){} }
+};
+
+/* ---- Пасхалка: 3 клика по голове ---- */
+let headClicks=0, headTimer;
+function headClick(){ headClicks++; clearTimeout(headTimer); headTimer=setTimeout(()=>headClicks=0,800);
+  if(headClicks>=3){ headClicks=0; showToast(t(CONFIG.ui.egg)); for(let i=0;i<60;i++) spawnParticles(Math.random()*innerWidth,-10); } }
+
+/* старт */
+applyLang();
+renderPhotoHotspots();
+</script>
+</body>
+</html>
